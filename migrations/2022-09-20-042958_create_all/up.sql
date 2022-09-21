@@ -1,0 +1,37 @@
+-- Your SQL goes here
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY NOT NULL,
+    username VARCHAR(255) NOT NULL UNIQUE CHECK (username <> ''),
+    name VARCHAR(255) NOT NULL CHECK (name <> ''),
+    session_id VARCHAR(255) CHECK (session_Id <> ''),
+    auto_apply BOOLEAN NOT NULL DEFAULT 0,
+    is_teacher BOOLEAN NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE rates (
+    id SERIAL PRIMARY KEY NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    food_name VARCHAR(255) NOT NULL CHECK (food_name <> ''),
+    rate_level TINYINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE total_rates (
+    id SERIAL PRIMARY KEY NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    rate_level TINYINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE meals (
+    id SERIAL PRIMARY KEY NOT NULL,
+    name VARCHAR(255) NOT NULL CHECK (name <> ''),
+    date DATE NOT NULL DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE applications (
+    id SERIAL PRIMARY KEY NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)

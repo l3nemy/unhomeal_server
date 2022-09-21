@@ -1,2 +1,5 @@
 /target
-*.pem
+/.vscode
+/*.pem
+/config.yml
+/secret.key
