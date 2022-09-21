@@ -8,12 +8,11 @@ use crate::{
         DbPool, UserDAO,
     },
     error::{Error, Result},
-    routes::{self, Rate, RateLevel, RateParam},
+    routes::{GetUserRatesParam, Rate, RateParam},
 };
 use actix_web::web::{block, Data};
 use chrono::{Duration, Local, NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
-use serde_json::Value;
 
 #[derive(Clone, Queryable, Insertable)]
 #[diesel(table_name = rates)]
@@ -30,36 +29,63 @@ impl RateDAO {
         Self::get(pool, Local::today().naive_local()).await
     }
 
+    pub async fn get_one_today(pool: Data<DbPool>, param: GetUserRatesParam) -> Result<Vec<Rate>> {
+        Self::get_one(pool, param, Local::today().naive_local()).await
+    }
+
     pub async fn get(pool: Data<DbPool>, date: NaiveDate) -> Result<Vec<Rate>> {
         let mut conn = get_conn(pool).await;
 
         let next_date = date + Duration::days(1);
         block(move || {
-            let mut join = rates::table
+            rates::table
                 .left_join(users::table.on(users::id.eq(dsl::user_id)))
                 .select((
                     users::username.assume_not_null(),
                     rates::food_name,
                     rates::rate_level,
                     rates::created_at,
-                ));
-
-            join.filter(rates::created_at.ge(date.and_hms(0, 0, 0)))
+                ))
+                .filter(rates::created_at.ge(date.and_hms(0, 0, 0)))
                 .filter(rates::created_at.lt(next_date.and_hms(0, 0, 0)))
                 .get_results::<(String, String, i8, NaiveDateTime)>(&mut conn)
         })
         .await?
         .map_err(Error::not_found_on_db)
-        .map(|v| {
-            v.iter()
-                .map(|rate| Rate {
-                    username: rate.0.clone(),
-                    food_name: rate.1.clone(),
-                    rate_level: rate.2.into(),
-                    created_at: rate.3,
-                })
-                .collect::<Vec<_>>()
-        })
+        .map(|v| v.iter().map(|elem| elem.into()).collect::<Vec<_>>())
+    }
+
+    pub async fn get_one(
+        pool: Data<DbPool>,
+        param: GetUserRatesParam,
+        date: NaiveDate,
+    ) -> Result<Vec<Rate>> {
+        let user = UserDAO::by_session_id(pool.clone(), &param.session_id).await?;
+        let target = UserDAO::by_username(pool.clone(), &param.username).await?;
+
+        if user.is_teacher || user.id == target.id {
+            let mut conn = get_conn(pool.clone()).await;
+
+            block(move || {
+                dsl::rates
+                    .left_join(users::table.on(users::id.eq(dsl::user_id)))
+                    .select((
+                        users::username.assume_not_null(),
+                        rates::food_name,
+                        rates::rate_level,
+                        rates::created_at,
+                    ))
+                    .filter(dsl::created_at.ge(date.and_hms(0, 0, 0)))
+                    .filter(dsl::created_at.lt((date + Duration::days(1)).and_hms(0, 0, 0)))
+                    .filter(dsl::user_id.eq(target.id))
+                    .load::<(String, String, i8, NaiveDateTime)>(&mut conn)
+            })
+            .await?
+            .map_err(Into::into)
+            .map(|v| v.iter().map(|elem| elem.into()).collect::<Vec<_>>())
+        } else {
+            Err(Error::Unprivileged)
+        }
     }
 
     pub async fn post(pool: Data<DbPool>, rate_param: RateParam) -> Result<()> {

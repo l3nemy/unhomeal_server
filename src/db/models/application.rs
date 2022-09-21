@@ -8,7 +8,7 @@ use crate::{
     routes::{ApplyParam, GetApplicationParam},
 };
 use actix_web::web::{block, Data};
-use chrono::{Local, NaiveDateTime, Duration, Datelike, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -66,23 +66,23 @@ impl ApplicationDAO {
     ) -> Result<Vec<ApplicationDAO>> {
         let user = UserDAO::by_session_id(pool.clone(), &param.session_id).await?;
 
-        let today = Local::today();         
-        let first_day = NaiveDate::from_ymd(today.year(), today.month(), 1);
-        let next_first_day = next_first_day_of_month(today.year(), today.month());
+        if user.is_teacher {
+            let today = Local::today();
+            let first_day = NaiveDate::from_ymd(today.year(), today.month(), 1);
+            let next_first_day = next_first_day_of_month(today.year(), today.month());
 
-        let today = Local::today().naive_local();
-        let tomorrow = today + Duration::days(1);
-        let mut conn = get_conn(pool).await;
-        block(move || dsl::applications
-            .filter(
-                dsl::created_at.ge(today.and_hms(0, 0, 0))
-            )
-            .filter(
-                dsl::created_at.lt(tomorrow.and_hms(0, 0, 0))
-            )
-            .load::<ApplicationDAO>(&mut conn))
+            let mut conn = get_conn(pool).await;
+            block(move || {
+                dsl::applications
+                    .filter(dsl::created_at.ge(first_day.and_hms(0, 0, 0)))
+                    .filter(dsl::created_at.lt(next_first_day.and_hms(0, 0, 0)))
+                    .load::<ApplicationDAO>(&mut conn)
+            })
             .await?
             .map_err(Into::into)
+        } else {
+            Err(Error::Unprivileged)
+        }
     }
 
     pub async fn get_one<T>(pool: Data<DbPool>, session_id: T) -> Result<ApplicationDAO>

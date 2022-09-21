@@ -66,17 +66,31 @@ pub async fn post_rate_route(pool: Data<DbPool>, param: Json<RateParam>) -> Resu
 }
 
 #[derive(Clone, Deserialize)]
-pub struct GetRateParam {
+pub struct GetRatesParam {
     session_id: String,
     food_name: Option<String>,
     date: Option<NaiveDate>,
 }
 
+#[derive(Clone, Deserialize)]
+pub struct GetUserRatesParam {
+    pub session_id: String,
+    pub username: String,
+    pub date: Option<NaiveDate>,
+}
+
 #[derive(Clone, Serialize)]
-pub struct GetRateResponse {
+pub struct GetRatesResponse {
     is_error: bool,
     rates: Vec<Rate>,
     total_avg_rate: f32,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GetUserRatesResponse {
+    is_error: bool,
+    rates: Vec<Rate>,
+    total_rate: u8,
 }
 
 #[derive(Clone, Deserialize, Serialize, Queryable)]
@@ -87,8 +101,22 @@ pub struct Rate {
     pub created_at: NaiveDateTime,
 }
 
-#[post("/get_rate")]
-pub async fn get_rate_route(pool: Data<DbPool>, param: Json<GetRateParam>) -> Result<HttpResponse> {
+impl From<&(String, String, i8, NaiveDateTime)> for Rate {
+    fn from(src: &(String, String, i8, NaiveDateTime)) -> Self {
+        Self {
+            username: src.0.clone(),
+            food_name: src.1.clone(),
+            rate_level: RateLevel::from(src.2),
+            created_at: src.3,
+        }
+    }
+}
+
+#[post("/get_rates")]
+pub async fn get_rates_route(
+    pool: Data<DbPool>,
+    param: Json<GetRatesParam>,
+) -> Result<HttpResponse> {
     //checking session_id
     UserDAO::by_session_id(pool.clone(), &param.session_id).await?;
 
@@ -110,10 +138,30 @@ pub async fn get_rate_route(pool: Data<DbPool>, param: Json<GetRateParam>) -> Re
 
     let total_avg_rate = TotalRateDAO::avg_today(pool).await?;
 
-    Ok(HttpResponse::Accepted().json(GetRateResponse {
+    Ok(HttpResponse::Accepted().json(GetRatesResponse {
         is_error: false,
         rates,
         total_avg_rate,
+    }))
+}
+
+#[post("/get_user_rate")]
+pub async fn get_user_rate_route(
+    pool: Data<DbPool>,
+    param: Json<GetUserRatesParam>,
+) -> Result<HttpResponse> {
+    let rates = if let Some(date) = param.date {
+        RateDAO::get_one(pool.clone(), param.0.clone(), date).await?
+    } else {
+        RateDAO::get_one_today(pool.clone(), param.0.clone()).await?
+    };
+
+    let total_rate = TotalRateDAO::get_one_today(pool, param.0.clone()).await?;
+
+    Ok(HttpResponse::Accepted().json(GetUserRatesResponse {
+        is_error: false,
+        rates,
+        total_rate,
     }))
 }
 

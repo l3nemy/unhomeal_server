@@ -19,7 +19,7 @@ use std::{fs::File, io::BufReader};
 
 use crate::{
     db::DbPool,
-    routes::{apply_route, get_rate_route, login, logout, post_rate_route, rank, test_route},
+    routes::{apply_route, get_rates_route, login, logout, post_rate_route, rank, test_route, get_user_rate_route},
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -86,7 +86,8 @@ async fn main() -> Result<()> {
             .service(test_route)
             .service(login)
             .service(logout)
-            .service(get_rate_route)
+            .service(get_user_rate_route)
+            .service(get_rates_route)
             .service(post_rate_route)
             .service(apply_route)
             .service(rank)

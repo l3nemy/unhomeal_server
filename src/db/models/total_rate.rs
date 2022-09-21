@@ -6,10 +6,10 @@ use crate::{
         DbPool,
     },
     error::{Error, Result},
-    routes::RateParam,
+    routes::{GetUserRatesParam, RateParam},
 };
 use actix_web::web::{block, Data};
-use chrono::{Duration, Local, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{Duration, Local, NaiveDate, NaiveDateTime};
 use diesel::prelude::*;
 
 #[derive(Clone, Queryable, Insertable)]
@@ -25,12 +25,11 @@ impl TotalRateDAO {
     pub async fn avg_today(pool: Data<DbPool>) -> Result<f32> {
         let mut conn = get_conn(pool).await;
 
-        let today = Local::today();
-        let tomorrow = today + Duration::days(1);
+        let today = Local::today().naive_local();
         let result = block(move || {
             dsl::total_rates
-                .filter(dsl::created_at.ge(today.and_hms(0, 0, 0).naive_local()))
-                .filter(dsl::created_at.lt(tomorrow.and_hms(0, 0, 0).naive_local()))
+                .filter(dsl::created_at.ge(today.and_hms(0, 0, 0)))
+                .filter(dsl::created_at.lt((today + Duration::days(1)).and_hms(0, 0, 0)))
                 .load::<TotalRateDAO>(&mut conn)
         })
         .await?
@@ -46,10 +45,36 @@ impl TotalRateDAO {
         Ok(total_avg)
     }
 
-    pub async fn post(pool: Data<DbPool>, rate_param: RateParam) -> Result<()> {
-        use crate::db::schema::total_rates::dsl;
-        use diesel::prelude::*;
+    pub async fn get_one_today(pool: Data<DbPool>, param: GetUserRatesParam) -> Result<u8> {
+        Self::get_one(pool, param, Local::today().naive_local()).await
+    }
 
+    pub async fn get_one(
+        pool: Data<DbPool>,
+        param: GetUserRatesParam,
+        date: NaiveDate,
+    ) -> Result<u8> {
+        let user = UserDAO::by_session_id(pool.clone(), &param.session_id).await?;
+        let target = UserDAO::by_username(pool.clone(), &param.username).await?;
+
+        if user.is_teacher || user.id == target.id {
+            let mut conn = get_conn(pool.clone()).await;
+            block(move || {
+                dsl::total_rates
+                    .select(dsl::rate_level)
+                    .filter(dsl::user_id.eq(&user.id))
+                    .filter(dsl::created_at.ge(date.and_hms(0, 0, 0)))
+                    .filter(dsl::created_at.lt((date + Duration::days(1)).and_hms(0, 0, 0)))
+                    .first::<u8>(&mut conn)
+            })
+            .await?
+            .map_err(Error::not_found_on_db)
+        } else {
+            Err(Error::Unprivileged)
+        }
+    }
+
+    pub async fn post(pool: Data<DbPool>, rate_param: RateParam) -> Result<()> {
         let user = UserDAO::by_session_id(pool.clone(), rate_param.session_id.clone()).await?;
 
         let mut conn = get_conn(pool).await;

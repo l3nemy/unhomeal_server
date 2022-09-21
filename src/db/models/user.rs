@@ -32,7 +32,7 @@ impl UserDAO {
         if let Some(sid) = user.session_id {
             Err(Error::AlreadyLoggedIn(sid))
         } else {
-            user.get_new_session(pool);
+            user.get_new_session(pool).await?;
             Ok(user)
         }
     }
@@ -103,7 +103,7 @@ impl UserDAO {
 
         let id = self.id;
         let sid = self.session_id.clone();
-        let result = block(move || {
+        block(move || {
             diesel::update(dsl::users.find(id))
                 .set(dsl::session_id.eq(&sid))
                 .execute(&mut conn)

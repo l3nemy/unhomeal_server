@@ -1,9 +1,7 @@
-#![allow(unused)]
-
 pub(crate) mod models;
 pub(crate) mod schema;
 
-use crate::{db::models::user::UserDAO, error::Error, token::UserToken, Result};
+use crate::db::models::user::UserDAO;
 use actix_web::web::{block, Data};
 
 pub use diesel::prelude::*;
