@@ -11,6 +11,7 @@ use actix_web::{
 };
 use diesel::r2d2::Pool;
 use diesel::{r2d2::ConnectionManager, MysqlConnection};
+use routes::get_applications_route;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs::File;
@@ -18,8 +19,8 @@ use std::fs::File;
 use crate::{
     db::DbPool,
     routes::{
-        apply_route, get_rates_route, get_user_rate_route, login, logout, post_rate_route, rank,
-        test_route,
+        apply_route, get_rates_route, get_user_rate_route, login_route, logout_route,
+        post_rate_route, rank_route, test_route,
     },
 };
 
@@ -91,14 +92,15 @@ async fn main() -> Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .service(test_route)
-            .service(login)
-            .service(logout)
-            .service(get_user_rate_route)
-            .service(get_rates_route)
-            .service(post_rate_route)
-            .service(apply_route)
-            .service(rank)
+            .service(test_route) //서버 온라인 체크
+            .service(login_route) // 로그인
+            .service(logout_route) // 로그아웃
+            .service(apply_route) // 신청
+            .service(get_applications_route) // 신청 명단
+            .service(post_rate_route) // 설문 제출
+            .service(get_rates_route) // 학생 설문 정보
+            .service(get_user_rate_route) // 단일 학생 설문 정보
+            .service(rank_route) // 급식 랭킹
             .app_data(Data::new(pool.clone()))
             .app_data(web::JsonConfig::default().error_handler(|err, _req| {
                 actix_web::error::InternalError::from_response(
@@ -116,6 +118,7 @@ async fn main() -> Result<()> {
                 .into()
             }))
             .wrap(Logger::default())
+            .wrap(Logger::new("%a %{User-Agent}i"))
     })
     //.bind_rustls(("127.0.0.1", config.port), rustls_config)?
     .bind(("127.0.0.1", config.port))?

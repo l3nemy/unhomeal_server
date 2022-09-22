@@ -29,7 +29,7 @@ struct LoginResponse {
 /// * Receives JSON request body as struct LoginParam
 /// * Responds with JSON body with session_id
 #[post("/login")]
-pub async fn login(pool: Data<DbPool>, param: Json<LoginParam>) -> Result<HttpResponse> {
+pub async fn login_route(pool: Data<DbPool>, param: Json<LoginParam>) -> Result<HttpResponse> {
     let user = UserDAO::login(pool, param.username.clone()).await?;
 
     Ok(HttpResponse::Accepted().json(LoginResponse {
@@ -51,7 +51,7 @@ pub struct LogoutResponse {
 }
 
 #[post("/logout")]
-pub async fn logout(pool: Data<DbPool>, param: Json<LogoutParam>) -> Result<HttpResponse> {
+pub async fn logout_route(pool: Data<DbPool>, param: Json<LogoutParam>) -> Result<HttpResponse> {
     UserDAO::by_session_id(pool.clone(), &param.session_id)
         .await?
         .logout(pool)

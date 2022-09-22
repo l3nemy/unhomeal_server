@@ -177,7 +177,7 @@ pub struct RankResponse {
 }
 
 #[post("/rank")]
-pub async fn rank(pool: Data<DbPool>, param: Json<RankParam>) -> Result<HttpResponse> {
+pub async fn rank_route(pool: Data<DbPool>, param: Json<RankParam>) -> Result<HttpResponse> {
     //checking session_id
     UserDAO::by_session_id(pool.clone(), &param.session_id).await?;
 
