@@ -28,16 +28,16 @@ pub struct RateReq {
 #[repr(i8)]
 pub enum RateLevel {
     Bad = -1,
-    Soso,
-    Good,
+    Soso = 1,
+    Good = 2,
 }
 
 impl From<i8> for RateLevel {
     fn from(level: i8) -> Self {
         match level {
             -1 => Self::Bad,
-            0 => Self::Soso,
-            1 => Self::Good,
+            1 => Self::Soso,
+            2 => Self::Good,
             _ => unimplemented!(),
         }
     }
