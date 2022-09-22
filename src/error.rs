@@ -94,8 +94,11 @@ impl Error {
 
 impl ResponseError for Error {
     fn status_code(&self) -> actix_web::http::StatusCode {
-        match self {
-            &Self::NotFoundOnDB => StatusCode::BAD_REQUEST,
+        use Error::*;
+        match *self {
+            NotFoundOnDB | LoginError(_) | AlreadyLoggedIn(_) | NoSuchSession | Unprivileged => {
+                StatusCode::BAD_REQUEST
+            }
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
