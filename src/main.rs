@@ -11,16 +11,23 @@ use actix_web::{
 };
 use diesel::r2d2::Pool;
 use diesel::{r2d2::ConnectionManager, MysqlConnection};
-use rustls::{Certificate, PrivateKey, ServerConfig};
-use rustls_pemfile::{read_one, Item};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{fs::File, io::BufReader};
+use std::fs::File;
 
 use crate::{
     db::DbPool,
-    routes::{apply_route, get_rates_route, login, logout, post_rate_route, rank, test_route, get_user_rate_route},
+    routes::{
+        apply_route, get_rates_route, get_user_rate_route, login, logout, post_rate_route, rank,
+        test_route,
+    },
 };
+
+/*
+use std::io::BufReader;
+use rustls::{Certificate, PrivateKey, ServerConfig};
+use rustls_pemfile::{read_one, Item};
+*/
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Config {
@@ -44,6 +51,7 @@ fn load_config() -> Result<Config> {
 async fn main() -> Result<()> {
     let config = load_config()?;
 
+    /*
     // generating certs for localhost :
     //      openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'
     print!("Reading certificate: ");
@@ -75,7 +83,7 @@ async fn main() -> Result<()> {
         .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(cert_chain, key)?;
-
+    */
     let connection = ConnectionManager::<MysqlConnection>::new(&config.database_url);
     let pool = Pool::builder()
         .build(connection)
@@ -109,7 +117,8 @@ async fn main() -> Result<()> {
             }))
             .wrap(Logger::default())
     })
-    .bind_rustls(("127.0.0.1", config.port), rustls_config)?
+    //.bind_rustls(("127.0.0.1", config.port), rustls_config)?
+    .bind(("127.0.0.1", config.port))?
     .workers(8)
     .run()
     .await?;
