@@ -8,6 +8,7 @@ use crate::{
     DbPool,
 };
 use actix_web::web::{block, Data};
+use anyhow::anyhow;
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
@@ -26,15 +27,25 @@ pub struct UserDAO {
 }
 
 impl UserDAO {
-    pub async fn login(pool: Data<DbPool>, user_id: String) -> Result<UserDAO> {
-        let mut user = Self::by_username(pool.clone(), user_id).await?;
+    pub async fn login(pool: Data<DbPool>, user_id: String) -> Result<(UserDAO, bool)> {
+        let mut user = Self::by_username(pool.clone(), user_id).await
+        .map_err(|e| {
+            if let Error::NotFoundOnDB = e {
+                Error::LoginError(anyhow!("NotFoundOnDB"))
+            } else {
+                e
+            }
+        })?;
+        
+        let mut logged_in = false;
 
-        if let Some(sid) = user.session_id {
-            Err(Error::AlreadyLoggedIn(sid))
-        } else {
-            user.get_new_session(pool).await?;
-            Ok(user)
+        // Check if sessionId exists
+        if let Some(_) = user.session_id {
+            logged_in = true;
         }
+
+        user.get_new_session(pool).await?;
+        Ok((user, logged_in))
     }
 
     pub async fn get_new_session(&mut self, pool: Data<DbPool>) -> Result<String> {
